@@ -1,73 +1,737 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <title>Dashboard - Creative Agency Workspace</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ERP HUB — Project + KOL + Kanban</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+  <style>
+    :root{
+      --bg:#0f1221; --card:#171a2b; --muted:#9aa4c3;
+      --text:#e9ecf8; --accent:#6ee7b7; --accent-2:#60a5fa;
+      --red:#ef4444; --yellow:#f59e0b; --border:#262a40;
+      --col-draft:#475569; --col-progress:#2563eb; --col-done:#16a34a;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:linear-gradient(180deg,#0e1120 0%, #0b0f1a 100%);color:var(--text);font:14px/1.4 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial}
+    a{color:var(--accent-2)}
+    .app{max-width:1200px;margin:auto;padding:24px}
+    header{display:flex;align-items:center;gap:16px;margin-bottom:16px}
+    .logo{font-weight:800;letter-spacing:.5px}
+    .badge{padding:2px 8px;border:1px solid var(--border);border-radius:999px;font-size:12px;color:var(--muted)}
+    .role{color:var(--accent);font-weight:700}
+    .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+    .tab{background:var(--card);border:1px solid var(--border);padding:10px 14px;border-radius:10px;cursor:pointer;color:var(--muted)}
+    .tab.active{color:var(--text);border-color:#334155;box-shadow:0 0 0 2px #1f2338 inset}
+    .hidden{display:none !important}
+    .grid{display:grid;gap:16px}
+    .two{grid-template-columns:repeat(2,1fr)}
+    .three{grid-template-columns:repeat(3,1fr)}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
+    .card h3{margin:0 0 10px}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    input,select,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:#0c1022;color:var(--text)}
+    textarea{min-height:90px;resize:vertical}
+    .row{display:flex;gap:8px;align-items:center}
+    .btn{background:#1b2140;color:var(--text);border:1px solid #2a3156;border-radius:10px;padding:10px 14px;cursor:pointer}
+    .btn.primary{background:linear-gradient(90deg,#2563eb,#7c3aed);border:none}
+    .btn.success{background:linear-gradient(90deg,#16a34a,#22c55e);border:none}
+    .btn.warn{background:linear-gradient(90deg,#f59e0b,#ef4444);border:none}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    /* Kanban */
+    .kanban{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .col{background:var(--card);border:1px dashed var(--border);border-radius:12px;min-height:280px;padding:10px}
+    .col h4{margin:6px 0 10px;font-size:13px;color:var(--muted)}
+    .col.draft{--stripe:var(--col-draft)}
+    .col.progress{--stripe:var(--col-progress)}
+    .col.done{--stripe:var(--col-done)}
+    .col{background-image:repeating-linear-gradient( 135deg, transparent 0 16px, color-mix(in oklab, var(--stripe) 30%, transparent) 16px 32px )}
+    .task{background:#0c1022;border:1px solid #1e2646;border-radius:10px;padding:10px;margin-bottom:10px}
+    .task .meta{font-size:12px;color:var(--muted)}
+    .task .title{font-weight:700}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid #2b335c;font-size:11px;color:#a5b4fc;background:#0b1030}
+    .flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .right{margin-left:auto}
+    .danger{color:#fecaca}
+    .success{color:#bbf7d0}
+    /* Auth */
+    .auth{max-width:420px;margin:8vh auto}
+    .footer{margin-top:18px;color:var(--muted);font-size:12px}
+    /* Table-like list */
+    .list{display:grid;grid-template-columns:1.2fr .8fr .6fr .6fr .6fr;gap:8px}
+    .list .head{color:var(--muted);font-size:12px}
+    .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
+    .toast{position:fixed;bottom:18px;right:18px;background:#0b102a;border:1px solid #26305b;color:#e5e7eb;padding:10px 12px;border-radius:10px;opacity:0;transform:translateY(10px);transition:.2s}
+    .toast.show{opacity:1;transform:translateY(0)}
+    .badge-col{border-left:4px solid var(--border);padding-left:8px}
+    .bg-muted{background:#0d1329;border:1px solid #202a52;border-radius:8px;padding:8px}
+    .kbd{border:1px solid #2a3156;border-bottom-width:3px;border-radius:6px;padding:0 6px;background:#0c1023}
+  </style>
 </head>
 <body>
-  <nav id="main-nav"></nav>
-  <section class="dashboard" id="dashboard-content">
-    <!-- Konten dinamis akan diisi oleh JS -->
+<div id="toast" class="toast"></div>
+<div id="auth-screen" class="auth card">
+  <h2>Masuk ke ERP HUB</h2>
+  <p class="badge">Supabase = <span class="role">otak</span> • Drive = <span class="role">otot</span> • Frontend = <span class="role">wajah</span></p>
+  <div class="grid">
+    <div>
+      <label>Email</label>
+      <input id="email" type="email" placeholder="you@company.com">
+    </div>
+    <div>
+      <label>Password</label>
+      <input id="password" type="password" placeholder="••••••••">
+    </div>
+    <div class="row">
+      <button id="login" class="btn primary">Masuk</button>
+      <button id="signup" class="btn">Daftar</button>
+    </div>
+    <div class="footer">
+      <div>Role diambil dari <span class="mono">user.user_metadata.role</span>. (Admin | Manager | Member)</div>
+      <div class="bg-muted" style="margin-top:8px">
+        Tips: untuk uji cepat tanpa logout/login, buka DevTools → Application → Local Storage dan edit <span class="mono">sb-*-auth-token</span>.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="app" class="app hidden">
+  <header>
+    <div class="logo">ERP HUB</div>
+    <span class="badge">User: <span id="user-email">-</span></span>
+    <span class="badge">Role: <span id="user-role" class="role">-</span></span>
+    <span class="right"></span>
+    <button id="btn-refresh" class="btn">Refresh</button>
+    <button id="logout" class="btn warn">Keluar</button>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab" data-tab="kanban">Kanban Board</button>
+    <button class="tab" data-tab="add-project">Tambah Project</button>
+    <button class="tab" data-tab="kol">Kerjasama KOL</button>
+    <button class="tab" data-tab="reports">Monitoring</button>
+  </nav>
+
+  <!-- Kanban Board -->
+  <section id="tab-kanban" class="grid">
+    <div class="row">
+      <div class="badge-col">
+        <div><strong>Filter</strong></div>
+        <div class="row">
+          <input id="search" placeholder="Cari judul/klien/tag… (⌘/Ctrl + K)">
+          <select id="filter-owner">
+            <option value="">Semua PIC</option>
+          </select>
+          <select id="filter-tag">
+            <option value="">Semua Tag</option>
+          </select>
+        </div>
+      </div>
+      <span class="right"></span>
+      <button id="btn-new-quick" class="btn success">+ Quick Draft</button>
+    </div>
+
+    <div class="kanban">
+      <div class="col draft" data-status="Draft">
+        <h4>Draft</h4>
+        <div class="dropzone" id="col-draft"></div>
+      </div>
+      <div class="col progress" data-status="In Progress">
+        <h4>In Progress</h4>
+        <div class="dropzone" id="col-progress"></div>
+      </div>
+      <div class="col done" data-status="Done">
+        <h4>Done</h4>
+        <div class="dropzone" id="col-done"></div>
+      </div>
+    </div>
   </section>
-  <script>
-    // Ambil user dari localStorage
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    if (!user.email) window.location.href = 'login.html';
 
-    // Role-based menu & dashboard
-    const menuMap = {
-      manager: ['Dashboard','Kanban Board','Bank Konten','Metrics','Buat Project','Chat','Absensi','Logout'],
-      admin:   ['Dashboard','Kanban Board','Bank Konten','Metrics','Buat Project','Chat','Absensi','Logout'],
-      editor:  ['Dashboard','Kanban Board','Bank Konten','Chat','Absensi','Logout'],
-      camera:  ['Dashboard','Kanban Board','Chat','Absensi','Logout'],
-      talent:  ['Dashboard','Chat','Absensi','Logout']
-    };
-    const menuLinkMap = {
-      'Dashboard':'dashboard.html',
-      'Kanban Board':'kanban.html',
-      'Bank Konten':'bank-konten.html',
-      'Metrics':'metrics.html',
-      'Buat Project':'project-create.html',
-      'Chat':'chat.html',
-      'Absensi':'absensi.html',
-      'Logout':'login.html'
-    };
-    const nav = document.getElementById('main-nav');
-    nav.innerHTML = `<ul>${menuMap[user.role].map(item=>`<li><a href="${menuLinkMap[item]}"${item==='Logout'?' onclick="localStorage.removeItem(\'user\')"':''}>${item}</a></li>`).join('')}</ul>`;
+  <!-- Tambah Project -->
+  <section id="tab-add-project" class="grid two hidden">
+    <div class="card">
+      <h3>Detail Project</h3>
+      <div class="grid">
+        <div>
+          <label>Judul</label>
+          <input id="p-title" placeholder="Nama project">
+        </div>
+        <div>
+          <label>Client/Brand</label>
+          <input id="p-client" placeholder="Nama klien/brand">
+        </div>
+        <div>
+          <label>PIC (Owner)</label>
+          <input id="p-owner" placeholder="Nama PIC">
+        </div>
+        <div>
+          <label>Tag (pisah koma)</label>
+          <input id="p-tags" placeholder="e.g. TikTok,IG,Ads">
+        </div>
+        <div>
+          <label>Status</label>
+          <select id="p-status">
+            <option>Draft</option>
+            <option>In Progress</option>
+            <option>Done</option>
+          </select>
+        </div>
+        <div>
+          <label>Deadline (YYYY-MM-DD)</label>
+          <input id="p-deadline" type="date">
+        </div>
+        <div class="grid">
+          <div>
+            <label>Brief / Catatan</label>
+            <textarea id="p-brief" placeholder="Ringkasan kreatif, CTA, tone, dsb."></textarea>
+          </div>
+          <div>
+            <label>Moodboard (URL Folder/Doc)</label>
+            <input id="p-moodboard" placeholder="https://drive.google.com/...">
+          </div>
+        </div>
+        <div>
+          <label>Folder Google Drive (root project)</label>
+          <input id="p-drive" placeholder="https://drive.google.com/drive/folders/...">
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button id="btn-save-project" class="btn primary">Simpan Project</button>
+        <div id="project-saved" class="success"></div>
+      </div>
+    </div>
 
-    // Simulasi fetch API dashboard (ringkasan, notifikasi, dsb)
-    async function fetchDashboardData(role){
-      // Simulasi data API
-      return {
-        tugasAktif: role==='editor'?5:3,
-        deadline: "28 Agustus 2025",
-        notifikasi: role==='manager'?4:2,
-        insight: [
-          {label:"Status Project Terbaru", value:"On Editing"},
-          {label:"Task Segera Selesai", value: role==='editor' ? 3 : 1},
-          {label:"Review Perlu Persetujuan", value: role==='manager' ? 2 : 0}
-        ]
-      }
-    }
-    // Render dashboard berdasarkan role
-    fetchDashboardData(user.role).then(data=>{
-      document.getElementById('dashboard-content').innerHTML = `
-        <h1>Selamat Datang, ${user.name}</h1>
-        <h3>Role: ${user.role.charAt(0).toUpperCase()+user.role.slice(1)}</h3>
-        <div class="summary">
-          <div class="card">Tugas Aktif: <span>${data.tugasAktif}</span></div>
-          <div class="card">Deadline Terdekat: <span>${data.deadline}</span></div>
-          <div class="card">Notifikasi: <span>${data.notifikasi}</span></div>
+    <div class="card">
+      <h3>Produksi</h3>
+      <div class="grid two">
+        <div>
+          <label>Shootlist: Scene</label>
+          <input id="s-scene" placeholder="Scene 1 - Opening">
         </div>
-        <div class="insight">
-          <h2>Insight Penting</h2>
-          <ul>
-            ${data.insight.map(i=>`<li>${i.label}: <b>${i.value}</b></li>`).join('')}
-          </ul>
+        <div>
+          <label>Angle/Shot</label>
+          <input id="s-angle" placeholder="WS / CU / Drone">
         </div>
-      `;
+        <div>
+          <label>Durasi (detik)</label>
+          <input id="s-duration" type="number" min="0" step="1" placeholder="5">
+        </div>
+        <div>
+          <label>Catatan</label>
+          <input id="s-notes" placeholder="VO, SFX, dsb.">
+        </div>
+        <button id="btn-add-shoot" class="btn">+ Tambah ke Shootlist</button>
+      </div>
+      <div id="shootlist" class="bg-muted" style="margin-top:10px"></div>
+
+      <h3 style="margin-top:18px">Kebutuhan Produksi</h3>
+      <div class="grid two">
+        <div>
+          <label>Properti</label>
+          <input id="n-props" placeholder="Tripod, Mic, Lampu…">
+        </div>
+        <div>
+          <label>Talent</label>
+          <input id="n-talent" placeholder="2 Talent (F/M)">
+        </div>
+        <div>
+          <label>Lokasi</label>
+          <input id="n-location" placeholder="Studio A, Outdoor Park">
+        </div>
+        <button id="btn-add-needs" class="btn">+ Simpan Kebutuhan</button>
+      </div>
+      <div id="needslist" class="bg-muted" style="margin-top:10px"></div>
+
+      <h3 style="margin-top:18px">Assets (Drive)</h3>
+      <div class="grid two">
+        <div>
+          <label>Tipe</label>
+          <select id="a-type">
+            <option value="moodboard">Moodboard</option>
+            <option value="raw">Raw Footage</option>
+            <option value="preview">Preview</option>
+            <option value="final">Final</option>
+            <option value="bank">Bank Konten</option>
+          </select>
+        </div>
+        <div>
+          <label>Link Google Drive</label>
+          <input id="a-url" placeholder="https://drive.google.com/...">
+        </div>
+        <button id="btn-add-asset" class="btn">+ Tambah Asset</button>
+      </div>
+      <div id="assetlist" class="bg-muted" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <!-- KOL -->
+  <section id="tab-kol" class="grid two hidden">
+    <div class="card">
+      <h3>Kerjasama KOL / Influencer</h3>
+      <div class="grid">
+        <div>
+          <label>Nama KOL</label>
+          <input id="k-name" placeholder="@username / Nama">
+        </div>
+        <div>
+          <label>Platform</label>
+          <select id="k-platform"><option>TikTok</option><option>Instagram</option><option>Youtube</option></select>
+        </div>
+        <div>
+          <label>Campaign</label>
+          <input id="k-campaign" placeholder="Q4 Product Launch">
+        </div>
+        <div>
+          <label>Fee (angka)</label>
+          <input id="k-fee" type="number" min="0" step="10000" placeholder="2000000">
+        </div>
+        <div>
+          <label>Deliverables</label>
+          <input id="k-deliv" placeholder="2x video 60s, 1x story">
+        </div>
+        <div>
+          <label>Link Hasil (Drive/Link)</label>
+          <input id="k-result" placeholder="https://drive.google.com/... atau link posting">
+        </div>
+        <div>
+          <label>Status</label>
+          <select id="k-status"><option>Planned</option><option>Live</option><option>Done</option></select>
+        </div>
+        <button id="btn-save-kol" class="btn primary">Simpan KOL</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Daftar KOL</h3>
+      <div id="kol-list" class="bg-muted"></div>
+    </div>
+  </section>
+
+  <!-- Monitoring -->
+  <section id="tab-reports" class="grid hidden">
+    <div class="card">
+      <h3>Ringkasan Progress</h3>
+      <div id="report" class="list">
+        <div class="head">Project</div>
+        <div class="head">Client</div>
+        <div class="head">Status</div>
+        <div class="head">Deadline</div>
+        <div class="head">Owner</div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+/* ---------- CONFIG ---------- */
+const SUPABASE_URL = "https://YOUR_PROJECT.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR_ANON_KEY";
+/* ---------- INIT ---------- */
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Simple toast
+function toast(msg, ms=2000){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), ms); }
+
+// Auth UI refs
+const authEl = document.getElementById('auth-screen');
+const appEl  = document.getElementById('app');
+const userEmailEl = document.getElementById('user-email');
+const userRoleEl  = document.getElementById('user-role');
+
+const tabs = document.querySelectorAll('.tab');
+const sections = {
+  kanban: document.getElementById('tab-kanban'),
+  "add-project": document.getElementById('tab-add-project'),
+  kol: document.getElementById('tab-kol'),
+  reports: document.getElementById('tab-reports')
+};
+
+function setActiveTab(name){
+  tabs.forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+  Object.entries(sections).forEach(([key,el])=> el.classList.toggle('hidden', key!==name));
+  localStorage.setItem('tab', name);
+}
+tabs.forEach(t=> t.addEventListener('click', ()=> setActiveTab(t.dataset.tab)));
+
+document.getElementById('login').onclick = async ()=>{
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const {data, error} = await sb.auth.signInWithPassword({email, password});
+  if(error){ toast('Login gagal: '+error.message, 3000); return; }
+  await postLogin();
+};
+
+document.getElementById('signup').onclick = async ()=>{
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  // default role = Member (bisa diubah Admin nanti)
+  const {data, error} = await sb.auth.signUp({email, password, options:{data:{role:'Member'}}});
+  if(error){ toast('Signup gagal: '+error.message, 3000); return; }
+  toast('Akun dibuat. Silakan login.');
+};
+
+document.getElementById('logout').onclick = async ()=>{
+  await sb.auth.signOut(); location.reload();
+};
+
+async function postLogin(){
+  const { data:{ user } } = await sb.auth.getUser();
+  if(!user){ return; }
+  const role = user.user_metadata?.role || 'Member';
+  userEmailEl.textContent = user.email;
+  userRoleEl.textContent  = role;
+  // Gate tabs by role
+  document.querySelector('[data-tab="add-project"]').classList.toggle('hidden', !(role==='Admin'||role==='Manager'));
+  document.querySelector('[data-tab="kol"]').classList.toggle('hidden', !(role==='Admin'||role==='Manager'));
+  // Show app
+  authEl.classList.add('hidden');
+  appEl.classList.remove('hidden');
+  // Restore last tab or default Kanban
+  setActiveTab(localStorage.getItem('tab') || 'kanban');
+  await Promise.all([loadKanban(), loadFilters(), loadReports(), loadKOL()]);
+}
+(async function boot(){
+  const { data:{ user } } = await sb.auth.getUser();
+  if(user){ await postLogin(); }
+})();
+
+/* ---------- ACCESS HELPERS ---------- */
+function requireRole(...allowed){
+  const current = userRoleEl.textContent || 'Member';
+  return allowed.includes(current);
+}
+
+/* ---------- PROJECT: CREATE ---------- */
+let currentProjectId = null;
+
+document.getElementById('btn-save-project').onclick = async ()=>{
+  if(!requireRole('Admin','Manager')){ toast('Akses ditolak.'); return; }
+  const payload = {
+    title: val('p-title'), client: val('p-client'),
+    owner: val('p-owner'), tags: csv(val('p-tags')),
+    status: val('p-status'), deadline: val('p-deadline') || null,
+    brief: val('p-brief'), moodboard_url: val('p-moodboard'),
+    drive_root: val('p-drive')
+  };
+  // insert projects
+  const { data:proj, error } = await sb.from('projects').insert(payload).select().single();
+  if(error){ toast('Gagal simpan project: '+error.message, 3500); return; }
+  currentProjectId = proj.id;
+  toast('Project disimpan ✔️');
+  document.getElementById('project-saved').textContent = `ID: ${proj.id}`;
+  await loadKanban();
+  await loadReports();
+};
+
+document.getElementById('btn-add-shoot').onclick = async ()=>{
+  if(!currentProjectId){ toast('Simpan project dulu.'); return; }
+  const item = {
+    project_id: currentProjectId,
+    scene: val('s-scene'), angle: val('s-angle'),
+    duration_sec: num('s-duration'), notes: val('s-notes')
+  };
+  const { error } = await sb.from('shootlist_items').insert(item);
+  if(error){ toast('Gagal tambah shoot: '+error.message,3500); return; }
+  toast('Shootlist ditambah');
+  appendList('shootlist', item, (x)=> `${x.scene} — ${x.angle} (${x.duration_sec||0}s) — ${x.notes||'-'}`);
+  clear(['s-scene','s-angle','s-duration','s-notes']);
+};
+
+document.getElementById('btn-add-needs').onclick = async ()=>{
+  if(!currentProjectId){ toast('Simpan project dulu.'); return; }
+  const needs = {
+    project_id: currentProjectId, properties: val('n-props'),
+    talents: val('n-talent'), locations: val('n-location')
+  };
+  const { error } = await sb.from('production_needs').insert(needs);
+  if(error){ toast('Gagal simpan kebutuhan: '+error.message,3500); return; }
+  toast('Kebutuhan produksi disimpan');
+  appendList('needslist', needs, (x)=> `Properti: ${x.properties||'-'} | Talent: ${x.talents||'-'} | Lokasi: ${x.locations||'-'}`);
+  clear(['n-props','n-talent','n-location']);
+};
+
+document.getElementById('btn-add-asset').onclick = async ()=>{
+  if(!currentProjectId){ toast('Simpan project dulu.'); return; }
+  const asset = {
+    project_id: currentProjectId, type: val('a-type'), url: val('a-url')
+  };
+  const { error } = await sb.from('project_assets').insert(asset);
+  if(error){ toast('Gagal tambah asset: '+error.message,3500); return; }
+  toast('Asset ditambah');
+  appendList('assetlist', asset, (x)=> `${x.type.toUpperCase()}: <a target="_blank" href="${x.url}">${x.url}</a>`);
+  clear(['a-url']);
+};
+
+function appendList(id, obj, render){
+  const el = document.getElementById(id);
+  const div = document.createElement('div');
+  div.innerHTML = render(obj);
+  el.prepend(div);
+}
+function val(id){ return document.getElementById(id).value.trim(); }
+function num(id){ const v=val(id); return v? Number(v): null; }
+function csv(str){ return str? str.split(',').map(s=>s.trim()).filter(Boolean): []; }
+function clear(ids){ ids.forEach(i=> document.getElementById(i).value = ''); }
+
+/* ---------- KANBAN: READ + DND ---------- */
+const dropzones = {
+  Draft: document.getElementById('col-draft'),
+  "In Progress": document.getElementById('col-progress'),
+  Done: document.getElementById('col-done')
+};
+
+async function loadKanban(){
+  const q = sb.from('projects').select('id,title,client,status,owner,deadline,tags,drive_root,moodboard_url,brief,updated_at');
+  const text = document.getElementById('search').value.trim().toLowerCase();
+  if(text){ q.ilike('title', `%${text}%`); }
+  const { data, error } = await q.order('updated_at', {ascending:false});
+  if(error){ toast('Gagal load kanban: '+error.message,3500); return; }
+  ['Draft','In Progress','Done'].forEach(s=> dropzones[s].innerHTML='');
+  data.forEach(p=> renderTask(p));
+  bindDragAndDrop();
+}
+function renderTask(p){
+  const el = document.createElement('div');
+  el.className='task'; el.draggable=true; el.dataset.id = p.id;
+  el.innerHTML = `
+    <div class="flex">
+      <div class="title">${escapeHtml(p.title)}</div>
+      ${p.tags?.length? `<span class="pill">${p.tags.join(' • ')}</span>`:''}
+      <span class="right"></span>
+      <button class="btn" data-open="${p.id}">Detail</button>
+      <button class="btn warn" data-del="${p.id}">Hapus</button>
+    </div>
+    <div class="meta">Client: <strong>${escapeHtml(p.client||'-')}</strong> • Owner: ${escapeHtml(p.owner||'-')} • Deadline: ${p.deadline||'-'}</div>
+    <div class="meta">Drive: ${p.drive_root? `<a target="_blank" href="${p.drive_root}">Folder</a>`: '-' } • Moodboard: ${p.moodboard_url? `<a target="_blank" href="${p.moodboard_url}">Link</a>`:'-'}</div>
+    <div class="meta">Status: <span class="pill">${p.status}</span></div>
+  `;
+  dropzones[p.status||'Draft']?.appendChild(el);
+  el.querySelector(`[data-open="${p.id}"]`).onclick = ()=> openProject(p);
+  el.querySelector(`[data-del="${p.id}"]`).onclick = ()=> deleteProject(p.id);
+}
+
+function bindDragAndDrop(){
+  document.querySelectorAll('.task').forEach(t=>{
+    t.addEventListener('dragstart', e=> e.dataTransfer.setData('text/plain', t.dataset.id));
+  });
+  document.querySelectorAll('.dropzone').forEach(zone=>{
+    zone.addEventListener('dragover', e=> { e.preventDefault(); zone.style.outline='2px solid #334155'; });
+    zone.addEventListener('dragleave', ()=> zone.style.outline='none');
+    zone.addEventListener('drop', async e=>{
+      e.preventDefault(); zone.style.outline='none';
+      const id = e.dataTransfer.getData('text/plain');
+      const status = zone.parentElement.dataset.status;
+      const { error } = await sb.from('projects').update({status}).eq('id', id);
+      if(error){ toast('Gagal update status: '+error.message,3000); return; }
+      toast('Status dipindah → '+status);
+      await Promise.all([loadKanban(), loadReports()]);
     });
-  </script>
+  });
+}
+
+async function deleteProject(id){
+  if(!requireRole('Admin','Manager')){ toast('Akses hapus ditolak.'); return; }
+  if(!confirm('Hapus project ini?')) return;
+  const { error } = await sb.from('projects').delete().eq('id', id);
+  if(error){ toast('Gagal hapus: '+error.message,3000); return; }
+  toast('Project dihapus');
+  await Promise.all([loadKanban(), loadReports()]);
+}
+
+function openProject(p){
+  setActiveTab('add-project');
+  // prefill
+  currentProjectId = p.id;
+  setVal('p-title', p.title); setVal('p-client', p.client||''); setVal('p-owner', p.owner||'');
+  setVal('p-tags', (p.tags||[]).join(',')); setVal('p-status', p.status||'Draft'); setVal('p-deadline', p.deadline||'');
+  setVal('p-brief', p.brief||''); setVal('p-moodboard', p.moodboard_url||''); setVal('p-drive', p.drive_root||'');
+  // load subtables
+  loadSubtables(p.id);
+}
+function setVal(id,v){ document.getElementById(id).value=v; }
+
+async function loadSubtables(pid){
+  const [shoot, needs, assets] = await Promise.all([
+    sb.from('shootlist_items').select('*').eq('project_id', pid).order('id',{ascending:false}),
+    sb.from('production_needs').select('*').eq('project_id', pid).order('id',{ascending:false}),
+    sb.from('project_assets').select('*').eq('project_id', pid).order('id',{ascending:false}),
+  ]);
+  const shootlist = document.getElementById('shootlist'); shootlist.innerHTML='';
+  (shoot.data||[]).forEach(x=> appendList('shootlist', x, (y)=> `${y.scene} — ${y.angle} (${y.duration_sec||0}s) — ${y.notes||'-'}`));
+  const needslist = document.getElementById('needslist'); needslist.innerHTML='';
+  (needs.data||[]).forEach(x=> appendList('needslist', x, (y)=> `Properti: ${y.properties||'-'} | Talent: ${y.talents||'-'} | Lokasi: ${y.locations||'-'}`));
+  const assetlist = document.getElementById('assetlist'); assetlist.innerHTML='';
+  (assets.data||[]).forEach(x=> appendList('assetlist', x, (y)=> `${y.type.toUpperCase()}: <a target="_blank" href="${y.url}">${y.url}</a>`));
+}
+
+/* ---------- FILTERS & SEARCH ---------- */
+document.getElementById('btn-refresh').onclick = ()=> { loadKanban(); loadReports(); loadKOL(); };
+document.getElementById('btn-new-quick').onclick = async ()=>{
+  if(!requireRole('Admin','Manager')){ toast('Akses ditolak.'); return; }
+  const title = prompt('Judul singkat:'); if(!title) return;
+  const { data, error } = await sb.from('projects').insert({title, status:'Draft'}).select().single();
+  if(error){ toast('Gagal buat draft: '+error.message,3000); return; }
+  toast('Draft dibuat');
+  await loadKanban();
+};
+
+const ownerFilter = document.getElementById('filter-owner');
+const tagFilter   = document.getElementById('filter-tag');
+document.getElementById('search').addEventListener('input', debounce(loadKanban, 250));
+ownerFilter.onchange = loadKanban;
+tagFilter.onchange   = loadKanban;
+
+async function loadFilters(){
+  const { data, error } = await sb.from('projects').select('owner,tags');
+  if(error) return;
+  const owners = Array.from(new Set((data||[]).map(x=>x.owner).filter(Boolean))).sort();
+  ownerFilter.innerHTML = `<option value="">Semua PIC</option>` + owners.map(o=>`<option>${escapeHtml(o)}</option>`).join('');
+  const tags = Array.from(new Set((data||[]).flatMap(x=>x.tags||[]))).sort();
+  tagFilter.innerHTML = `<option value="">Semua Tag</option>` + tags.map(t=>`<option>${escapeHtml(t)}</option>`).join('');
+}
+
+/* ---------- REPORTS ---------- */
+async function loadReports(){
+  const { data, error } = await sb.from('projects').select('title,client,status,deadline,owner').order('deadline',{ascending:true}).limit(50);
+  if(error) return;
+  const rep = document.getElementById('report');
+  rep.innerHTML = `
+    <div class="head">Project</div>
+    <div class="head">Client</div>
+    <div class="head">Status</div>
+    <div class="head">Deadline</div>
+    <div class="head">Owner</div>
+  `;
+  (data||[]).forEach(p=>{
+    rep.insertAdjacentHTML('beforeend', `
+      <div>${escapeHtml(p.title)}</div>
+      <div>${escapeHtml(p.client||'-')}</div>
+      <div><span class="pill">${p.status}</span></div>
+      <div>${p.deadline||'-'}</div>
+      <div>${escapeHtml(p.owner||'-')}</div>
+    `);
+  });
+}
+
+/* ---------- KOL ---------- */
+document.getElementById('btn-save-kol').onclick = async ()=>{
+  if(!requireRole('Admin','Manager')){ toast('Akses ditolak.'); return; }
+  const payload = {
+    name: val('k-name'), platform: val('k-platform'), campaign: val('k-campaign'),
+    fee: num('k-fee'), deliverables: val('k-deliv'), result_link: val('k-result'),
+    status: val('k-status')
+  };
+  const { error } = await sb.from('kol_campaigns').insert(payload);
+  if(error){ toast('Gagal simpan KOL: '+error.message, 3500); return; }
+  toast('KOL disimpan ✔️');
+  clear(['k-name','k-campaign','k-fee','k-deliv','k-result']);
+  await loadKOL();
+};
+
+async function loadKOL(){
+  const { data, error } = await sb.from('kol_campaigns').select('*').order('id', {ascending:false}).limit(100);
+  if(error) return;
+  const el = document.getElementById('kol-list'); el.innerHTML = '';
+  (data||[]).forEach(k=>{
+    const div = document.createElement('div');
+    div.className='task';
+    div.innerHTML = `
+      <div class="flex">
+        <div class="title">${escapeHtml(k.name)} · ${escapeHtml(k.platform)}</div>
+        <span class="pill">${escapeHtml(k.campaign||'-')}</span>
+        <span class="pill">${k.status}</span>
+        <span class="right"></span>
+        <span class="pill">Rp ${formatIDR(k.fee||0)}</span>
+      </div>
+      <div class="meta">Deliverables: ${escapeHtml(k.deliverables||'-')}</div>
+      <div class="meta">Hasil: ${k.result_link? `<a target="_blank" href="${k.result_link}">${k.result_link}</a>`:'-'}</div>
+    `;
+    el.appendChild(div);
+  });
+}
+
+/* ---------- UTIL ---------- */
+function escapeHtml(s){ return (s??'').toString().replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+function debounce(fn, ms){ let t; return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn(...args), ms); }; }
+function formatIDR(n){ return n.toLocaleString('id-ID'); }
+
+/* ---------- COMMAND PALETTE ---------- */
+document.addEventListener('keydown', (e)=>{
+  const k = (e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='k';
+  if(k){ e.preventDefault(); document.getElementById('search').focus(); document.getElementById('search').select(); }
+});
+</script>
+
+<!--
+==== SUPABASE SCHEMA (jalankan sebagai referensi di SQL editor) ===================
+create table if not exists public.projects (
+  id bigint generated always as identity primary key,
+  title text not null,
+  client text,
+  owner text,
+  tags text[] default '{}',
+  status text default 'Draft' check (status in ('Draft','In Progress','Done')),
+  deadline date,
+  brief text,
+  moodboard_url text,
+  drive_root text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+create table if not exists public.shootlist_items (
+  id bigint generated always as identity primary key,
+  project_id bigint references public.projects(id) on delete cascade,
+  scene text, angle text, duration_sec int, notes text,
+  created_at timestamptz default now()
+);
+create table if not exists public.production_needs (
+  id bigint generated always as identity primary key,
+  project_id bigint references public.projects(id) on delete cascade,
+  properties text, talents text, locations text,
+  created_at timestamptz default now()
+);
+create table if not exists public.project_assets (
+  id bigint generated always as identity primary key,
+  project_id bigint references public.projects(id) on delete cascade,
+  type text check (type in ('moodboard','raw','preview','final','bank')),
+  url text not null,
+  created_at timestamptz default now()
+);
+create table if not exists public.kol_campaigns (
+  id bigint generated always as identity primary key,
+  name text not null, platform text not null,
+  campaign text, fee numeric, deliverables text, result_link text, status text,
+  created_at timestamptz default now()
+);
+
+-- RLS
+alter table public.projects enable row level security;
+alter table public.shootlist_items enable row level security;
+alter table public.production_needs enable row level security;
+alter table public.project_assets enable row level security;
+alter table public.kol_campaigns enable row level security;
+
+-- Policy contoh: seluruh member bisa read, hanya Manager/Admin yang write
+create policy "read all projects" on public.projects for select using ( true );
+create policy "write projects by role" on public.projects for insert with check ( auth.jwt()->>'role' in ('Admin','Manager') );
+create policy "update projects by role" on public.projects for update using ( auth.jwt()->>'role' in ('Admin','Manager') );
+create policy "delete projects by role" on public.projects for delete using ( auth.jwt()->>'role' in ('Admin','Manager') );
+
+-- Terapkan pattern policy yang sama untuk tabel lain:
+create policy "read all" on public.shootlist_items for select using (true);
+create policy "write by role" on public.shootlist_items for insert with check (auth.jwt()->>'role' in ('Admin','Manager'));
+create policy "read all needs" on public.production_needs for select using (true);
+create policy "write needs by role" on public.production_needs for insert with check (auth.jwt()->>'role' in ('Admin','Manager'));
+create policy "read all assets" on public.project_assets for select using (true);
+create policy "write assets by role" on public.project_assets for insert with check (auth.jwt()->>'role' in ('Admin','Manager'));
+create policy "read all kol" on public.kol_campaigns for select using (true);
+create policy "write kol by role" on public.kol_campaigns for insert with check (auth.jwt()->>'role' in ('Admin','Manager'));
+
+-- Supabase Auth: set role di metadata (Admin/Manager/Member).
+-- Ubah role user:
+-- update auth.users set raw_user_meta_data = jsonb_set(coalesce(raw_user_meta_data,'{}'::jsonb), '{role}', '"Admin"') where email='you@company.com';
+====================================================================================
+-->
 </body>
 </html>
