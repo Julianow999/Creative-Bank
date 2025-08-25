@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard - Creative Agency Workspace</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav id="main-nav"></nav>
+  <section class="dashboard" id="dashboard-content">
+    <!-- Konten dinamis akan diisi oleh JS -->
+  </section>
+  <script>
+    // Ambil user dari localStorage
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    if (!user.email) window.location.href = 'login.html';
+
+    // Role-based menu & dashboard
+    const menuMap = {
+      manager: ['Dashboard','Kanban Board','Bank Konten','Metrics','Buat Project','Chat','Absensi','Logout'],
+      admin:   ['Dashboard','Kanban Board','Bank Konten','Metrics','Buat Project','Chat','Absensi','Logout'],
+      editor:  ['Dashboard','Kanban Board','Bank Konten','Chat','Absensi','Logout'],
+      camera:  ['Dashboard','Kanban Board','Chat','Absensi','Logout'],
+      talent:  ['Dashboard','Chat','Absensi','Logout']
+    };
+    const menuLinkMap = {
+      'Dashboard':'dashboard.html',
+      'Kanban Board':'kanban.html',
+      'Bank Konten':'bank-konten.html',
+      'Metrics':'metrics.html',
+      'Buat Project':'project-create.html',
+      'Chat':'chat.html',
+      'Absensi':'absensi.html',
+      'Logout':'login.html'
+    };
+    const nav = document.getElementById('main-nav');
+    nav.innerHTML = `<ul>${menuMap[user.role].map(item=>`<li><a href="${menuLinkMap[item]}"${item==='Logout'?' onclick="localStorage.removeItem(\'user\')"':''}>${item}</a></li>`).join('')}</ul>`;
+
+    // Simulasi fetch API dashboard (ringkasan, notifikasi, dsb)
+    async function fetchDashboardData(role){
+      // Simulasi data API
+      return {
+        tugasAktif: role==='editor'?5:3,
+        deadline: "28 Agustus 2025",
+        notifikasi: role==='manager'?4:2,
+        insight: [
+          {label:"Status Project Terbaru", value:"On Editing"},
+          {label:"Task Segera Selesai", value: role==='editor' ? 3 : 1},
+          {label:"Review Perlu Persetujuan", value: role==='manager' ? 2 : 0}
+        ]
+      }
+    }
+    // Render dashboard berdasarkan role
+    fetchDashboardData(user.role).then(data=>{
+      document.getElementById('dashboard-content').innerHTML = `
+        <h1>Selamat Datang, ${user.name}</h1>
+        <h3>Role: ${user.role.charAt(0).toUpperCase()+user.role.slice(1)}</h3>
+        <div class="summary">
+          <div class="card">Tugas Aktif: <span>${data.tugasAktif}</span></div>
+          <div class="card">Deadline Terdekat: <span>${data.deadline}</span></div>
+          <div class="card">Notifikasi: <span>${data.notifikasi}</span></div>
+        </div>
+        <div class="insight">
+          <h2>Insight Penting</h2>
+          <ul>
+            ${data.insight.map(i=>`<li>${i.label}: <b>${i.value}</b></li>`).join('')}
+          </ul>
+        </div>
+      `;
+    });
+  </script>
+</body>
+</html>
